@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>notepad</title>
+</head>
+<style type="text/css">
+ol,ul{
+display:block;
+list-style-type:none;
+margin:3px;
+}
+</style><body>
+<div>&lt;!DOCTYPE html&gt;<br>
+&lt;html&gt;<br>
+&lt;head&gt;<br>
+&lt;meta charset="UTF-8"&gt;<br>
+&lt;meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"&gt;<br>
+&lt;title&gt;&#24067;&#23043;&#23043;&#27169;&#25311;&#22120;&lt;/title&gt;<br>
+&lt;style&gt;<br>
+body{margin:0;overflow:hidden;background:#111;font-family:sans-serif}<br>
+#ui{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:10}<br>
+button,label{background:#ffaa00;color:#000;border:0;padding:12px 20px;border-radius:25px;font-weight:bold;font-size:16px}<br>
+label{background:#2a6f97;color:#fff}<br>
+#file{display:none}<br>
+#tip{position:fixed;top:15px;left:15px;color:#fff;background:rgba(0,0,0,.6);padding:10px 15px;border-radius:10px;font-size:14px}<br>
+&lt;/style&gt;<br>
+&lt;/head&gt;<br>
+&lt;body&gt;<br>
+&lt;div id="tip"&gt;&#129528; &#24067;&#23043;&#23043;&#27169;&#25311;&#22120;&lt;br&gt;&#23548;&#20837;&#27169;&#22411;&#21518;&#23427;&#20250;&#20498;&#19979;&lt;/div&gt;<br>
+&lt;div id="ui"&gt;<br>
+&lt;label for="file"&gt;&#128194; &#23548;&#20837;&#27169;&#22411;&lt;/label&gt;<br>
+&lt;input type="file" id="file" accept=".glb,.gltf,.obj,.fbx"&gt;<br>
+&lt;button id="reset"&gt;&#128260; &#37325;&#32622;&lt;/button&gt;<br>
+&lt;/div&gt;<br>
+&lt;script type="importmap"&gt;<br>
+{"imports":{<br>
+"three":"https://unpkg.com/three@0.126.0/build/three.module.js",<br>
+"three/addons/":"https://unpkg.com/three@0.126.0/examples/jsm/",<br>
+"cannon-es":"https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"<br>
+}}<br>
+&lt;/script&gt;<br>
+&lt;script type="module"&gt;<br>
+import*as THREE from'three';<br>
+import{OrbitControls}from'three/addons/controls/OrbitControls.js';<br>
+import{GLTFLoader}from'three/addons/loaders/GLTFLoader.js';<br>
+import{OBJLoader}from'three/addons/loaders/OBJLoader.js';<br>
+import{FBXLoader}from'three/addons/loaders/FBXLoader.js';<br>
+import*as CANNON from'cannon-es';<br>
+<br>
+// &#22330;&#26223;<br>
+const scene=new THREE.Scene();<br>
+scene.background=new THREE.Color(0x111122);<br>
+const camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.1,1000);<br>
+camera.position.set(4,4,8);<br>
+const renderer=new THREE.WebGLRenderer({antialias:true});<br>
+renderer.setSize(innerWidth,innerHeight);<br>
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));<br>
+// ===== &#24320;&#21551;&#38452;&#24433; =====<br>
+renderer.shadowMap.enabled=true;<br>
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;<br>
+document.body.appendChild(renderer.domElement);<br>
+<br>
+// &#25511;&#21046;&#22120;<br>
+const controls=new OrbitControls(camera,renderer.domElement);<br>
+controls.enableDamping=true;<br>
+controls.target.set(0,1,0);<br>
+<br>
+// &#28783;&#20809;<br>
+scene.add(new THREE.AmbientLight(0xffffff,.5));<br>
+const dl=new THREE.DirectionalLight(0xffffff,1.8);<br>
+dl.position.set(5,10,7);<br>
+// ===== &#20027;&#20809;&#28304;&#25237;&#23556;&#38452;&#24433; =====<br>
+dl.castShadow=true;<br>
+dl.shadow.mapSize.width=1024;<br>
+dl.shadow.mapSize.height=1024;<br>
+const d=12;<br>
+dl.shadow.camera.left=-d;<br>
+dl.shadow.camera.right=d;<br>
+dl.shadow.camera.top=d;<br>
+dl.shadow.camera.bottom=-d;<br>
+dl.shadow.camera.near=1;<br>
+dl.shadow.camera.far=30;<br>
+dl.shadow.bias=-0.0005;<br>
+scene.add(dl);<br>
+// &#34917;&#20809;&#65292;&#19981;&#25237;&#24433;<br>
+const back=new THREE.PointLight(0x4466ff,.5);<br>
+back.position.set(-5,3,-5);<br>
+scene.add(back);<br>
+<br>
+// &#22320;&#38754;<br>
+const ground=new THREE.Mesh(<br>
+&nbsp; new THREE.CircleGeometry(20,32),<br>
+&nbsp; new THREE.MeshStandardMaterial({color:0x2a2a3a,roughness:.8,metalness:.1,side:THREE.DoubleSide})<br>
+);<br>
+ground.rotation.x=-Math.PI/2;<br>
+// ===== &#22320;&#38754;&#25509;&#25910;&#38452;&#24433; =====<br>
+ground.receiveShadow=true;<br>
+scene.add(ground);<br>
+const grid=new THREE.GridHelper(30,20,0x88aaff,0x445588);<br>
+grid.position.y=0.01;<br>
+scene.add(grid);<br>
+<br>
+// &#29289;&#29702;&#19990;&#30028;<br>
+const world=new CANNON.World();<br>
+world.gravity.set(0,-9.82,0);<br>
+world.broadphase=new CANNON.SAPBroadphase(world);<br>
+world.defaultContactMaterial.friction=0.4;<br>
+world.defaultContactMaterial.restitution=0.2;<br>
+const groundBody=new CANNON.Body({mass:0,shape:new CANNON.Plane()});<br>
+groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0),-Math.PI/2);<br>
+world.addBody(groundBody);<br>
+<br>
+let bodies=[];<br>
+<br>
+// &#21152;&#36733;&#27169;&#22411;<br>
+document.getElementById('file').onchange=e=&gt;{<br>
+&nbsp; const f=e.target.files[0];if(!f)return;<br>
+&nbsp; clearAll();<br>
+&nbsp; const ext=f.name.split('.').pop().toLowerCase();<br>
+&nbsp; let loader;<br>
+&nbsp; if(ext==='glb'||ext==='gltf')loader=new GLTFLoader();<br>
+&nbsp; else if(ext==='obj')loader=new OBJLoader();<br>
+&nbsp; else if(ext==='fbx')loader=new FBXLoader();<br>
+&nbsp; else{return alert('&#35831;&#29992; GLB/GLTF/OBJ/FBX')}<br>
+&nbsp; <br>
+&nbsp; const r=new FileReader();<br>
+&nbsp; r.onload=ev=&gt;{<br>
+&nbsp;&nbsp;&nbsp; loader.parse(ev.target.result,'',res=&gt;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const model=ext==='glb'||ext==='gltf'?res.scene:res;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // &#20301;&#32622;&#35843;&#25972;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const box=new THREE.Box3().setFromObject(model);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const c=box.getCenter(new THREE.Vector3());<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; model.position.y-=box.min.y;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; model.position.x-=c.x;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; model.position.z-=c.z;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; scene.add(model);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; model.updateMatrixWorld(true);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // &#25286;&#35299;mesh<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const meshes=[];<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; model.traverse(o=&gt;{if(o.isMesh)meshes.push(o)});<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if(!meshes.length){alert('&#27169;&#22411;&#27809;&#26377;&#32593;&#26684;');scene.remove(model);return}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const data=meshes.map(m=&gt;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m.updateWorldMatrix(true,false);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const p=new THREE.Vector3(),q=new THREE.Quaternion(),s=new THREE.Vector3();<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m.matrixWorld.decompose(p,q,s);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; return{m,p,q,s};<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; data.forEach(d=&gt;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if(d.m.parent)d.m.parent.remove(d.m);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; scene.add(d.m);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; d.m.position.copy(d.p);d.m.quaternion.copy(d.q);d.m.scale.copy(d.s);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // ===== &#37096;&#20214;&#25237;&#23556;&#21644;&#25509;&#25910;&#38452;&#24433; =====<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; d.m.castShadow=true;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; d.m.receiveShadow=true;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // &#26448;&#36136;&#34917;&#20805;&#65306;&#22914;&#26524;&#26159;&#26631;&#20934;&#26448;&#36136;&#65292;&#21487;&#24320;&#21551;&#38452;&#24433;&#30456;&#20851;&#65288;&#19968;&#33324;&#40664;&#35748;&#21363;&#21487;&#65289;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; scene.remove(model);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // &#21019;&#24314;&#29289;&#29702;&#20307;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; data.forEach(d=&gt;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const m=d.m;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if(!m.geometry.boundingBox)m.geometry.computeBoundingBox();<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const bb=m.geometry.boundingBox;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const size=new THREE.Vector3().subVectors(bb.max,bb.min);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const hx=Math.max(size.x*m.scale.x/2,.1);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const hy=Math.max(size.y*m.scale.y/2,.1);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const hz=Math.max(size.z*m.scale.z/2,.1);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const gc=new THREE.Vector3().addVectors(bb.min,bb.max).multiplyScalar(.5);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const wc=gc.clone().applyMatrix4(m.matrixWorld);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const body=new CANNON.Body({mass:1});<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; body.addShape(new CANNON.Box(new CANNON.Vec3(hx,hy,hz)));<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; body.position.set(wc.x,wc.y,wc.z);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; body.quaternion.set(m.quaternion.x,m.quaternion.y,m.quaternion.z,m.quaternion.w);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; body.angularDamping=.2;body.linearDamping=.1;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; world.addBody(body);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; bodies.push({body,mesh:m,offset:gc});<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; document.getElementById('tip').innerHTML='&#9989; &#24050;&#23548;&#20837;&lt;br&gt;&#25302;&#21160;&#35270;&#35282;&#35266;&#23519;&#20498;&#19979;';<br>
+&nbsp;&nbsp;&nbsp; },err=&gt;{alert('&#21152;&#36733;&#22833;&#36133;:'+err.message)});<br>
+&nbsp; };<br>
+&nbsp; r.readAsArrayBuffer(f);<br>
+&nbsp; e.target.value='';<br>
+};<br>
+<br>
+document.getElementById('reset').onclick=()=&gt;{clearAll();document.getElementById('tip').innerHTML='&#129528; &#24050;&#37325;&#32622;&lt;br&gt;&#37325;&#26032;&#23548;&#20837;&#27169;&#22411;'};<br>
+<br>
+function clearAll(){<br>
+&nbsp; bodies.forEach(b=&gt;{<br>
+&nbsp;&nbsp;&nbsp; world.removeBody(b.body);<br>
+&nbsp;&nbsp;&nbsp; if(b.mesh.parent)b.mesh.parent.remove(b.mesh);<br>
+&nbsp; });<br>
+&nbsp; bodies=[];<br>
+}<br>
+<br>
+// &#24490;&#29615;<br>
+function loop(){<br>
+&nbsp; world.step(1/60,Math.min(.1,0.016),2);<br>
+&nbsp; const q=new THREE.Quaternion();<br>
+&nbsp; bodies.forEach(b=&gt;{<br>
+&nbsp;&nbsp;&nbsp; q.set(b.body.quaternion.x,b.body.quaternion.y,b.body.quaternion.z,b.body.quaternion.w);<br>
+&nbsp;&nbsp;&nbsp; const off=b.offset.clone().applyQuaternion(q);<br>
+&nbsp;&nbsp;&nbsp; b.mesh.position.copy(b.body.position).sub(off);<br>
+&nbsp;&nbsp;&nbsp; b.mesh.quaternion.copy(q);<br>
+&nbsp; });<br>
+&nbsp; controls.update();<br>
+&nbsp; renderer.render(scene,camera);<br>
+&nbsp; requestAnimationFrame(loop);<br>
+}<br>
+loop();<br>
+<br>
+addEventListener('resize',()=&gt;{<br>
+&nbsp; camera.aspect=innerWidth/innerHeight;<br>
+&nbsp; camera.updateProjectionMatrix();<br>
+&nbsp; renderer.setSize(innerWidth,innerHeight);<br>
+});<br>
+&lt;/script&gt;<br>
+&lt;/body&gt;<br>
+&lt;/html&gt;</div>
+</body>
+</html>
